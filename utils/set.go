@@ -35,6 +35,9 @@ func NewSet(singleton Any, unsafe ...bool) (*set, error) {
 	if !canEqual {
 		return nil, fmt.Errorf("type %s cannot be equal", typ)
 	}
+	if typ.Kind() == reflect.Ptr {
+		return nil, fmt.Errorf("type %s is ptr", typ)
+	}
 	return s, nil
 }
 
