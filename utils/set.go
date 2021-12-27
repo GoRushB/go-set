@@ -150,8 +150,16 @@ func (s *set) Add(list ...Any) *set {
 		return s
 	}
 	typ := reflect.TypeOf(list[0])
-	isSlice := typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array
-	if typ != s.itemType && (isSlice && typ.Elem() != s.itemType) {
+	kind := typ.Kind()
+	isPtr := kind == reflect.Ptr
+	isSlice := kind == reflect.Slice || kind == reflect.Array
+	isPtrSlice := isSlice && typ.Elem().Kind() == reflect.Ptr
+	if isPtrSlice {
+		typ = typ.Elem().Elem()
+	} else if isSlice || isPtr {
+		typ = typ.Elem()
+	}
+	if typ != s.itemType {
 		return s
 	}
 	defer s.TryLock()()
@@ -159,14 +167,21 @@ func (s *set) Add(list ...Any) *set {
 		if list[i] == nil {
 			continue
 		}
-		if !isSlice {
-			s.add(list[i])
-		} else {
-			val := reflect.ValueOf(list[i])
+		val := reflect.ValueOf(list[i])
+		switch true {
+		case isSlice:
 			size := val.Len()
 			for j := 0; j < size; j++ {
-				s.add(val.Index(j).Interface())
+				v := val.Index(j)
+				if isPtrSlice {
+					v = v.Elem()
+				}
+				s.add(v.Interface())
 			}
+		case isPtr:
+			s.add(val.Elem().Interface())
+		default:
+			s.add(list[i])
 		}
 	}
 	return s
@@ -187,8 +202,16 @@ func (s *set) Remove(list ...Any) *set {
 		return s
 	}
 	typ := reflect.TypeOf(list[0])
-	isSlice := typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array
-	if typ != s.itemType && (isSlice && typ.Elem() != s.itemType) {
+	kind := typ.Kind()
+	isPtr := kind == reflect.Ptr
+	isSlice := kind == reflect.Slice || kind == reflect.Array
+	isPtrSlice := isSlice && typ.Elem().Kind() == reflect.Ptr
+	if isPtrSlice {
+		typ = typ.Elem().Elem()
+	} else if isSlice || isPtr {
+		typ = typ.Elem()
+	}
+	if typ != s.itemType {
 		return s
 	}
 	defer s.TryLock()()
@@ -196,14 +219,21 @@ func (s *set) Remove(list ...Any) *set {
 		if list[i] == nil {
 			continue
 		}
-		if !isSlice {
-			s.remove(list[i])
-		} else {
-			val := reflect.ValueOf(list[i])
+		val := reflect.ValueOf(list[i])
+		switch true {
+		case isSlice:
 			size := val.Len()
 			for j := 0; j < size; j++ {
-				s.remove(val.Index(j).Interface())
+				v := val.Index(j)
+				if isPtrSlice {
+					v = v.Elem()
+				}
+				s.remove(v.Interface())
 			}
+		case isPtr:
+			s.remove(val.Elem().Interface())
+		default:
+			s.remove(list[i])
 		}
 	}
 	if s.removeNum >= maxRemoveNum {
